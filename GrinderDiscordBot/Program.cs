@@ -18,7 +18,7 @@ public class program
 
         _client.Log += Log;
 
-        var token = File.ReadAllText("");
+        var token = File.ReadAllText("Discord_Token.txt");
 
         await _client.LoginAsync(TokenType.Bot, token);
         await _client.StartAsync();
