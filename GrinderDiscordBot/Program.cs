@@ -64,7 +64,10 @@ public class DiscordBotService : BackgroundService
         if (message.Author.IsBot)
             return;
 
-        if (!message.Content.StartsWith("!hello"))
+        if (!message.Content.StartsWith("!"))
+            return;
+
+        if (message.Content.StartsWith("!hello"))
             await message.Channel.SendMessageAsync("Hello there!");
 
         else if (message.Content == "!gay")
