@@ -73,8 +73,24 @@ public class DiscordBotService : BackgroundService
         else if (message.Content == "!gay")
             await message.Channel.SendMessageAsync($"{message.Author.Mention} is gay!");
 
-        Console.WriteLine($"Command received: {message.Content}");
-            
+        else if (message.Content.StartsWith("!join"))
+        {
+            await JoinVoiceChannelAsync(message);
+        }
 
+            Console.WriteLine($"Command received: {message.Content}");
+    }
+
+    private async Task JoinVoiceChannelAsync(SocketMessage message)
+    {
+        var user = message.Author as SocketGuildUser;
+        if (user?.VoiceChannel == null)
+        {
+            await message.Channel.SendMessageAsync("You must join a voice channel!");
+            return;
+        }
+
+        var player = await _audioService.Players.JoinAsync(user.VoiceChannel.Guild.Id, user.VoiceChannel.Id);
+        await message.Channel.SendMessageAsync($"Joined {user.VoiceChannel.Name}!");
     }
 }
