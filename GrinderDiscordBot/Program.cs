@@ -1,9 +1,12 @@
-﻿using Discord;
+﻿using Microsoft.Extensions.Options;
+using Discord;
 using Discord.WebSocket;
+using Lavalink4NET;
+using Lavalink4NET.Extensions;
+using Lavalink4NET.Players;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Lavalink4NET.Extensions;
-using Lavalink4NET;
+using Microsoft.Extensions.Options;
 
 var builder = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
@@ -78,6 +81,10 @@ public class DiscordBotService : BackgroundService
             await JoinVoiceChannelAsync(message);
         }
 
+        else if (message.Content.StartsWith("!play"))
+        {
+            await PlayMusicAsync(message);
+        }
             Console.WriteLine($"Command received: {message.Content}");
     }
 
@@ -93,4 +100,53 @@ public class DiscordBotService : BackgroundService
         var player = await _audioService.Players.JoinAsync(user.VoiceChannel.Guild.Id, user.VoiceChannel.Id);
         await message.Channel.SendMessageAsync($"Joined {user.VoiceChannel.Name}!");
     }
-}
+
+    private async Task PlayMusicAsync(SocketMessage message)
+    {
+        var user = message.Author as SocketGuildUser;
+
+        if (user?.VoiceChannel == null)
+        {
+            await message.Channel.SendMessageAsync("You must be in a voice channel!");
+            return;
+        }
+
+        var query = message.Content.Substring(6); 
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            await message.Channel.SendMessageAsync("Enter a song name!");
+            return;
+        }
+
+        var playerOptions = new LavalinkPlayerOptions();
+        var retrieveOptions = new PlayerRetrieveOptions(PlayerChannelBehavior.Join);
+
+        var result = await _audioService.Players.RetrieveAsync<LavalinkPlayer, LavalinkPlayerOptions>(
+            user.Guild.Id,
+            user.VoiceChannel.Id,
+            playerFactory: PlayerFactory.Default,
+            options: Options.Create(playerOptions),
+            retrieveOptions: retrieveOptions);
+
+        var player = result.Player;
+
+        if (player == null)
+        {
+            await message.Channel.SendMessageAsync("Unable to connect to voice!");
+            return;
+        }
+
+        // Sök och ladda track
+        var track = await _audioService.Tracks.LoadTrackAsync(query, Lavalink4NET.Rest.Entities.Tracks.TrackSearchMode.YouTube);
+
+        if (track == null)
+        {
+            await message.Channel.SendMessageAsync("Unable to find song!");
+            return;
+        }
+
+        // Spela
+        await player.PlayAsync(track);
+        await message.Channel.SendMessageAsync($"Now playing: **{track.Title}** by {track.Author}");
+    }
+}                                                                                                                                   
