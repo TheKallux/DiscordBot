@@ -7,6 +7,8 @@ using Lavalink4NET.Players;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using GrinderDiscordBot.Commands;
+
 
 var builder = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
@@ -20,6 +22,8 @@ var builder = Host.CreateDefaultBuilder(args)
         // Lavalink
         services.AddLavalink();
 
+        services.AddSingleton<MusicCommands>();
+
         // Our bot service
         services.AddHostedService<DiscordBotService>();
     });
@@ -30,11 +34,13 @@ public class DiscordBotService : BackgroundService
 {
     private readonly DiscordSocketClient _client;
     private readonly IAudioService _audioService;
+    private readonly MusicCommands _musicCommands;
 
-    public DiscordBotService(DiscordSocketClient client, IAudioService audioService)
+    public DiscordBotService(DiscordSocketClient client, IAudioService audioService, MusicCommands musicCommands)
     {
         _client = client;
         _audioService = audioService;
+        _musicCommands = musicCommands;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -78,14 +84,15 @@ public class DiscordBotService : BackgroundService
 
         else if (message.Content.StartsWith("!join"))
         {
-            await JoinVoiceChannelAsync(message);
+            await _musicCommands.JoinVoiceChannelAsync(message);
         }
 
         else if (message.Content.StartsWith("!play"))
         {
-            await PlayMusicAsync(message);
+            await _musicCommands.PlayMusicAsync(message);
         }
-            Console.WriteLine($"Command received: {message.Content}");
+
+        Console.WriteLine($"Command received: {message.Content}");
     }
 
     private async Task JoinVoiceChannelAsync(SocketMessage message)
@@ -101,52 +108,5 @@ public class DiscordBotService : BackgroundService
         await message.Channel.SendMessageAsync($"Joined {user.VoiceChannel.Name}!");
     }
 
-    private async Task PlayMusicAsync(SocketMessage message)
-    {
-        var user = message.Author as SocketGuildUser;
-
-        if (user?.VoiceChannel == null)
-        {
-            await message.Channel.SendMessageAsync("You must be in a voice channel!");
-            return;
-        }
-
-        var query = message.Content.Substring(6); 
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            await message.Channel.SendMessageAsync("Enter a song name!");
-            return;
-        }
-
-        var playerOptions = new LavalinkPlayerOptions();
-        var retrieveOptions = new PlayerRetrieveOptions(PlayerChannelBehavior.Join);
-
-        var result = await _audioService.Players.RetrieveAsync<LavalinkPlayer, LavalinkPlayerOptions>(
-            user.Guild.Id,
-            user.VoiceChannel.Id,
-            playerFactory: PlayerFactory.Default,
-            options: Options.Create(playerOptions),
-            retrieveOptions: retrieveOptions);
-
-        var player = result.Player;
-
-        if (player == null)
-        {
-            await message.Channel.SendMessageAsync("Unable to connect to voice!");
-            return;
-        }
-
-        // Sök och ladda track
-        var track = await _audioService.Tracks.LoadTrackAsync(query, Lavalink4NET.Rest.Entities.Tracks.TrackSearchMode.YouTube);
-
-        if (track == null)
-        {
-            await message.Channel.SendMessageAsync("Unable to find song!");
-            return;
-        }
-
-        // Spela
-        await player.PlayAsync(track);
-        await message.Channel.SendMessageAsync($"Now playing: **{track.Title}** by {track.Author}");
-    }
-}                                                                                                                                   
+    
+}
